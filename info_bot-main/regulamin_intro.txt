@@ -1,0 +1,23 @@
+Regulamin i mechanika grupy Nocna24 (wersja luzacka)
+
+0. O co tu chodzi? (Założenie całego projektu i czym jest Marketplace)
+
+Grupa Nocna24 to społeczność użytkowników, którzy dzielą się:
+- opiniami o sklepach online,
+- ocenami i doświadczeniami zakupowymi,
+- ciekawymi ofertami, kodami i okazjami,
+- prywatnymi ogłoszeniami przez sekcję Marketplace.
+
+🔔 WAŻNE:
+Nie prowadzimy sklepu.
+Nie sprzedajemy produktów.
+Nie ustalamy żadnych rankingów ręcznie – wszystko liczy się automatycznie przez bota.
+Nie bierzemy udziału w transakcjach i nie odpowiadamy za oferty. Wszystko, co publikujesz, robisz na własną odpowiedzialność.
+
+Bot to narzędzie społecznościowe – służy do oceniania sklepów, dodawania opinii i przeszukiwania produktów w bazie. Nie jest to sklep, nie prowadzimy sprzedaży ani nie pośredniczymy w kupnie.
+
+💬 A czym jest Marketplace?
+To osobna sekcja w bocie, gdzie użytkownicy mogą wrzucać własne ogłoszenia – sprzedaż, wymiana, poszukiwania. To jak tablica ogłoszeń – administracja nie ingeruje, nie pośredniczy i nie bierze odpowiedzialności za treści i transakcje między użytkownikami.
+
+📦 Opcja bezpiecznego zakupu:
+Przy ogłoszeniach możesz aktywować "bezpieczny zakup" – czyli system escrow. Kasa trafia najpierw na pośredniczący rachunek i dopiero po potwierdzeniu odbioru przez kupującego jest przekazywana sprzedającemu. System działa podobnie do OLX i zwiększa bezpieczeństwo obu stron. Użycie tej opcji jest dobrowolne, ale zalecane przy transakcjach z nieznajomymi.

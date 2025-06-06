@@ -1,15 +1,18 @@
 from aiogram import Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import Bot
-
-bot = Bot(token="7584466647:AAH-g23V2MY-QtKxWdEqRfQ5VCh-lEKS-04")  # Replace "YOUR_BOT_TOKEN" with your actual bot token
-dp = Dispatcher(bot)
-from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.exceptions import ChatAdminRequired, UserAdminInvalid
+from info_bot import dp, bot
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
 import sqlite3
 from datetime import datetime, timedelta
 import asyncio  # Dodano do obsługi opóźnień
 import logging  # Import logging module
+from click_counter import get_user_messages_count, get_all_messages_count
+
+# Define admin user IDs here
+ADMIN_IDS = {7572862671}  # Replace with actual Telegram user IDs of admins
 
 # Słowniki do przechowywania czasu ostatnich zgłoszeń dla "Zaproponuj Sklep" i "Zaproponuj Zmiany"
 last_propose_shop_time = {}
@@ -33,44 +36,133 @@ def init_db():
             bot_link TEXT,
             operator_link TEXT,
             chat_link TEXT
+        CREATE TABLE IF NOT EXISTS warns (
+            user_id INTEGER,
+            warn_time INTEGER
         )
     """)
     conn.commit()
     conn.close()
 
-@dp.message_handler(commands=["start"])
-async def start_command(message: types.Message):
-    await main_menu(message)
-
 async def help_command(message: types.Message):
     await message.answer("Dostępne komendy:\n/start - Rozpocznij\n/help - Pomoc\n/lista - Lista sklepów")
 
-#async def lista_command(message: types.Message):
- #   keyboard = InlineKeyboardMarkup()
-  #  keyboard.add(InlineKeyboardButton("Sklep 1", callback_data="shop_1"))
-   # keyboard.add(InlineKeyboardButton("Sklep 2", callback_data="shop_2"))
-    #await message.answer("Wybierz sklep:", reply_markup=keyboard)
+@dp.message_handler(commands=["ban"])
+async def ban_user(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.reply("Nie masz uprawnień do tej komendy.")
+        return
 
-async def join_us_menu(message: types.Message):
-    keyboard = InlineKeyboardMarkup()
- #   keyboard.add(InlineKeyboardButton("Zaproponuj sklep", callback_data="propose_shop"))
-    keyboard.add(InlineKeyboardButton("Zaproponuj zmiany", callback_data="propose_changes"))
-#    keyboard.add(InlineKeyboardButton("Zgłoś niedziałający link", callback_data="report_broken_link"))
-    keyboard.add(InlineKeyboardButton("Powrót do menu", callback_data="back_to_menu"))
+    if message.reply_to_message:
+        user_id = message.reply_to_message.from_user.id
+    else:
+        try:
+            user_id = int(message.get_args())
+        except:
+            await message.reply("Użycie: /ban <user_id> lub odpowiedz na wiadomość użytkownika.")
+            return
 
-    await message.answer(
-        "🌟 *Dołącz do Nas!* 🌟\n\n"
-        "Dziękujemy za Twoje zaangażowanie! Aby nasz bot mógł się rozwijać i pomagać większej liczbie osób, prosimy o minimum zaangażowania.\n\n"
-        "W celu weryfikacji, wystaw opinię w co najmniej jednym ze sklepów, w którym ostatnio robiłeś zakupy.\n\n"
-        "Tutaj znajdziesz skarbiec możliwości, w którym możesz zaproponować nowe sklepy, zgłosić zmiany lub problemy. Wybierz jedną z opcji poniżej:",
-        parse_mode="Markdown",
-        reply_markup=keyboard
-    )
+    try:
+        await message.bot.kick_chat_member(message.chat.id, user_id)
+        await message.reply(f"Użytkownik {user_id} został zbanowany.")
+    except ChatAdminRequired:
+        await message.reply("Bot nie ma uprawnień administratora.")
+    except UserAdminInvalid:
+        await message.reply("Nie można zbanować administratora.")
+    except Exception as e:
+        await message.reply(f"Błąd: {e}")
 
-#async def propose_shop(callback_query: types.CallbackQuery):
- #   await callback_query.message.answer("Podaj nazwę sklepu, opis, link do bota, operatora i czatu w formacie:\nNazwa, Opis, Link do bota, Link do operatora, Link do czatu")
- #   await EditOpinionState.waiting_for_opinion.set()
+@dp.message_handler(commands=["mute"])
+async def mute_user(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.reply("Nie masz uprawnień do tej komendy.")
+        return
 
+    if message.reply_to_message:
+        user_id = message.reply_to_message.from_user.id
+    else:
+        try:
+            user_id = int(message.get_args())
+        except:
+            await message.reply("Użycie: /mute <user_id> lub odpowiedz na wiadomość użytkownika.")
+            return
+
+    until_date = datetime.now() + timedelta(hours=1)
+    try:
+        await message.bot.restrict_chat_member(
+            message.chat.id,
+            user_id,
+            permissions=types.ChatPermissions(can_send_messages=False),
+            until_date=until_date
+        )
+        await message.reply(f"Użytkownik {user_id} został wyciszony na 1 godzinę.")
+    except ChatAdminRequired:
+        await message.reply("Bot nie ma uprawnień administratora.")
+    except UserAdminInvalid:
+        await message.reply("Nie można wyciszyć administratora.")
+    except Exception as e:
+        await message.reply(f"Błąd: {e}")
+
+@dp.message_handler(commands=["warn"])
+async def warn_user(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.reply("Nie masz uprawnień do tej komendy.")
+        return
+
+    if not message.reply_to_message:
+        await message.reply("Użyj /warn odpowiadając na wiadomość użytkownika.")
+        return
+
+    user_id = message.reply_to_message.from_user.id
+
+    # Sprawdź, czy użytkownik miał już warn w ciągu ostatnich 7 dni
+    conn = sqlite3.connect("bot_database.db")
+    cursor = conn.cursor()
+    week_ago = int((datetime.now() - timedelta(days=7)).timestamp())
+    cursor.execute("DELETE FROM warns WHERE warn_time < ?", (week_ago,))
+    conn.commit()
+    cursor.execute("SELECT COUNT(*) FROM warns WHERE user_id = ?", (user_id,))
+    warn_count = cursor.fetchone()[0]
+
+    if warn_count >= 1:
+        # Ban za drugi warn w ciągu 7 dni
+        try:
+            await message.bot.kick_chat_member(message.chat.id, user_id)
+            await message.reply(f"Użytkownik {user_id} otrzymał 2 ostrzeżenie w ciągu 7 dni i został zbanowany.")
+        except Exception as e:
+            await message.reply(f"Błąd przy banowaniu: {e}")
+        # Usuń warny po banie
+        cursor.execute("DELETE FROM warns WHERE user_id = ?", (user_id,))
+        conn.commit()
+    else:
+        # Dodaj warn
+        now = int(datetime.now().timestamp())
+        cursor.execute("INSERT INTO warns (user_id, warn_time) VALUES (?, ?)", (user_id, now))
+        conn.commit()
+        await message.reply(f"Użytkownik {user_id} otrzymał ostrzeżenie! (ważne 7 dni)")
+        try:
+            await message.bot.send_message(user_id, "Otrzymałeś ostrzeżenie od administratora! Po drugim ostrzeżeniu w 7 dni zostaniesz zbanowany.")
+        except Exception:
+            pass
+
+    conn.close()
+
+@dp.message_handler(commands=["warns"])
+async def check_warns(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Użyj /warns odpowiadając na wiadomość użytkownika.")
+        return
+    user_id = message.reply_to_message.from_user.id
+    conn = sqlite3.connect("bot_database.db")
+    cursor = conn.cursor()
+    week_ago = int((datetime.now() - timedelta(days=7)).timestamp())
+    cursor.execute("DELETE FROM warns WHERE warn_time < ?", (week_ago,))
+    conn.commit()
+    cursor.execute("SELECT COUNT(*) FROM warns WHERE user_id = ?", (user_id,))
+    warn_count = cursor.fetchone()[0]
+    conn.close()
+    await message.reply(f"Użytkownik {user_id} ma {warn_count} ostrzeżenie(a) z ostatnich 7 dni.")
+    
 @dp.message_handler(state=EditOpinionState.waiting_for_opinion, content_types=[types.ContentType.TEXT])
 async def receive_proposed_shop(message: types.Message, state: FSMContext):
     try:
@@ -123,6 +215,39 @@ def register_join_us_handlers(dp: Dispatcher):
         keyboard.row(KeyboardButton("Powrót do menu"))
         await message.answer("Wybierz opcję:", reply_markup=keyboard)
 
+@dp.message_handler(commands=["tematid"])
+async def show_thread_id(message: types.Message):
+    thread_id = getattr(message, "message_thread_id", None)
+    if thread_id:
+        await message.reply(f"ID tego tematu (thread_id): <code>{thread_id}</code>", parse_mode="HTML")
+    else:
+        await message.reply("Ta wiadomość nie jest w temacie (wątku) lub Twoja wersja Telegrama nie obsługuje tematów.")
+
+@dp.message_handler(commands=["del"])
+async def delete_last_messages(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.reply("Nie masz uprawnień do tej komendy.")
+        return
+
+    try:
+        count = int(message.get_args())
+        if count < 1 or count > 100:
+            await message.reply("Podaj liczbę od 1 do 100.")
+            return
+    except:
+        await message.reply("Użycie: /del <liczba>")
+        return
+
+    chat_id = message.chat.id
+    deleted = 0
+    async for msg in message.bot.iter_history(chat_id, limit=count+1):  # +1 żeby usunąć też komendę
+        try:
+            await msg.delete()
+            deleted += 1
+        except Exception:
+            pass
+    await message.reply(f"Usunięto {deleted} wiadomości.")
+    
 @dp.callback_query_handler(lambda c: c.data.startswith("change_"))
 async def handle_change_request(callback_query: types.CallbackQuery, state: FSMContext):
     shop_name = callback_query.data.split("_")[1]
@@ -132,6 +257,89 @@ async def handle_change_request(callback_query: types.CallbackQuery, state: FSMC
     await callback_query.message.answer(f"Podaj nowe dane dla sklepu {shop_name} w formacie:\nLink do bota, Link do operatora, Link do czatu")
     await EditOpinionState.waiting_for_opinion.set()
 
+@dp.message_handler(commands=["ranking"])
+async def ranking_command(message: types.Message):
+    conn = sqlite3.connect("bot_database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_name, role, reputation FROM users ORDER BY reputation DESC LIMIT 10")
+    users = cursor.fetchall()
+    conn.close()
+
+    if not users:
+        await message.reply("Brak użytkowników w rankingu.")
+        return
+
+    text = "🏆 *Ranking aktywnych użytkowników:*\n\n"
+    for idx, (user_name, role, reputation) in enumerate(users, 1):
+        text += f"{idx}. {user_name or 'Anonim'}\n   {role or ''} | {reputation} pkt\n"
+    await message.reply(text, parse_mode="Markdown")
+
+@dp.message_handler(commands=["top"])
+async def top_shops_command(message: types.Message):
+    conn = sqlite3.connect("bot_database.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT s.shop_name, IFNULL(AVG(o.rating), 0) AS avg_rating, COUNT(o.rating) as opinie
+        FROM shops s
+        LEFT JOIN opinions o ON s.shop_name = o.shop_name
+        GROUP BY s.shop_name
+        HAVING opinie > 0
+        ORDER BY avg_rating DESC
+        LIMIT 10
+    """)
+    shops = cursor.fetchall()
+    conn.close()
+
+    if not shops:
+        await message.reply("Brak ocenionych sklepów.")
+        return
+
+    text = "🏆 *Najlepsze sklepy (średnia ocen):*\n\n"
+    for idx, (shop_name, avg_rating, opinie) in enumerate(shops, 1):
+        text += f"{idx}. {shop_name} – {avg_rating:.2f}⭐ ({opinie} opinii)\n"
+    await message.reply(text, parse_mode="Markdown")
+
+@dp.message_handler(commands=["/mojeinfo"])
+async def me_command(message: types.Message):
+    user_id = message.from_user.id
+    user_msgs = get_user_messages_count(user_id)
+    all_msgs = get_all_messages_count()
+    conn = sqlite3.connect("bot_database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_name, role, reputation FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        username, role, reputation = row
+        username = username or message.from_user.first_name or "Nieznany"
+        # Przykładowe liczenie wiadomości (jeśli masz taką kolumnę)
+        try:
+            conn = sqlite3.connect("bot_database.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM messages WHERE user_id = ?", (user_id,))
+            user_msgs = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM messages")
+            all_msgs = cursor.fetchone()[0]
+            conn.close()
+        except Exception:
+            user_msgs = "—"
+            all_msgs = "—"
+        text = (
+            f"👤 Użytkownik: {username}\n"
+            f"🏅 Ranga: {role}\n"
+            f"📊 Punkty: {reputation}\n"
+            f"Twoje Wiadomości: {user_msgs}\n"
+            f"Wiadomości ogólnie: {all_msgs}\n\n"
+            f"LINKI:\n"
+            f"Zaproś kogoś na czat: https://t.me/+aUofaQMoWFs4Yzdk \n"
+            f"Nocna Kanał: https://t.me/nocna_official \n"
+            f"Nocna Bot: https://t.me/Nocna24_bot \n"
+            f"Kontakt: https://t.me/KiedysMichal"
+        )
+    else:
+        text = "Nie znaleziono Twojego profilu w bazie."
+    
 @dp.message_handler(state=EditOpinionState.waiting_for_opinion, content_types=[types.ContentType.TEXT])
 async def receive_change_request(message: types.Message, state: FSMContext):
     try:
@@ -218,10 +426,18 @@ async def lista_sklepow_handler(message: types.Message):
     # Obsługa opcji Lista sklepów
     await lista_command(message)
 
-@dp.message_handler(lambda message: message.text == "2. NOCna i dołącz do nas")
-async def nocna_dolacz_handler(message: types.Message):
-    # Obsługa opcji NOCna i dołącz do nas
-    await join_us_menu(message)
+async def lista_command(message: types.Message):
+    conn = sqlite3.connect("bot_database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT shop_name FROM shops")
+    shops = cursor.fetchall()
+    conn.close()
+
+    if shops:
+        shop_list = "\n".join([shop[0] for shop in shops])
+        await message.answer(f"Lista sklepów:\n{shop_list}")
+    else:
+        await message.answer("Brak sklepów w bazie danych.")
 
 @dp.message_handler(lambda message: message.text == "3. Opinie, czat i oferty pracy")
 async def opinie_czat_praca_handler(message: types.Message):

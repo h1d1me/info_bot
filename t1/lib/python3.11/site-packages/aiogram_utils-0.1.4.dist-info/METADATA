@@ -1,0 +1,18 @@
+Metadata-Version: 2.1
+Name: aiogram-utils
+Version: 0.1.4
+Summary: Misc utils for aiogram
+Home-page: https://github.com/LDmitriy7/aiogram_utils
+Author: LDmitriy7
+Author-email: ldm.work2019@gmail.com
+Requires-Python: >=3.10,<4.0
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Requires-Dist: aiodns (>=3.0.0,<4.0.0)
+Requires-Dist: aiogram (>=2.20,<3.0)
+Requires-Dist: mongoengine (>=0.24.1,<0.25.0)
+Requires-Dist: ujson (>=5.2.0,<6.0.0)
+Project-URL: Repository, https://github.com/LDmitriy7/aiogram_utils
+Description-Content-Type: text/markdown
+
+# TODO

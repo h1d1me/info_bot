@@ -1,0 +1,15 @@
+1. Co tu się dzieje? (Przewodnik użytkownika)
+
+1.1. Nocna24 to miejsce, gdzie możesz podzielić się opinią, ocenić sklep, wrzucić ofertę lub ogłoszenie.
+1.2. Dołączając do grupy i korzystając z bota, zgadzasz się na niniejsze zasady.
+1.3. Komendy bota:
+
+/szukaj [produkt] – przeszukuje sklepy w bazie pod kątem danego produktu.
+/opinia [Sklep] [Twoja opina] – wrzuć swoją recenzję (max 500 znaków).
+/ocena [Sklep] [1-5] – wystaw ocenę sklepowi.
+/ranking – pokazuje tabelę aktywnych użytkowników.
+/top – lista najlepiej ocenianych sklepów.
+/zgłoszenie [oferta|błąd] [opis] – zgłoś promocję lub coś, co nie działa.
+/statystyki – twoja aktywność i punkty (od rangi "Aktywny").
+/gry – dla rozrywki.
+/pomoc – pełen opis komend i działania bota.

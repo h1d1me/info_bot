@@ -1,0 +1,20 @@
+2. Opinie, punkty i jak zdobyć szacunek
+
+2.1. Jak pisać opinie:
+Bez hejtu, spamu i bełkotu.
+Konkret, rzetelność i maksymalnie 500 znaków.
+
+2.2. Punktacja:
++5 pkt – za opinię zaakceptowaną przez bota.
++5 pkt – za działającą i przydatną ofertę.
++2 pkt – za pomoc na czacie (gdy inni klikną 🆘 lub ✅ pod twoim wpisem).
+–5 pkt – za spam, agresję, wulgaryzmy.
+
+2.3. Ranking:
+/ranking – pokazuje kto ile ma punktów.
+/top – sklepy z najwyższymi ocenami.
+
+Co tydzień bot ogłasza TOP 3 użytkowników, którzy zgarniają bonus:
++50 pkt i chwała.
++30 pkt.
++20 pkt.

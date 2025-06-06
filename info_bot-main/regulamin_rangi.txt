@@ -1,0 +1,11 @@
+3. Rangi w grupie
+
+🪨 Nowicjusz (0–9 pkt): start.
+🗺 Zwiadowca (10–29 pkt): rozglądasz się.
+🔦 Tropiciel (30–59 pkt): działasz.
+🧭 Odkrywca (60–99 pkt): masz doświadczenie.
+🌒 Nocny (100–199 pkt): jesteś tu na serio.
+💎 Poszukiwacz Skarbów (200+ pkt): legenda.
+
+Moderator – zarządza punktami i ładem.
+Administrator – ogarnia całość.

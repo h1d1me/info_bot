@@ -1,0 +1,15 @@
+📜 Lista komend ogólnodostępnych:
+
+Komenda    Opis działania
+/start     Uruchamia bota i pokazuje menu główne.
+/help      Lista dostępnych komend i podpowiedzi.
+/me        Twój profil: nick, ranga, punkty, liczba opinii, link do profilu.
+/ranking   Ranking użytkowników według zdobytej reputacji.
+/top       TOP lista sklepów – najwyższe średnie ocen.
+/lista     Pełna lista sklepów w bazie.
+/myid      Twój unikalny ID Telegram.
+/opinie    Przegląd ostatnich opinii użytkowników o sklepach.
+/kontakt   Informacja jak skontaktować się z administracją.
+/marketplace Wejście do sekcji ogłoszeń (kup/sprzedaj/wymień).
+/yt        Pobierz film lub playlistę z YouTube (działa tylko w grupie).
+/tl        Tłumacz: /tl [kod języka] [tekst] (np. /tl pl hello).

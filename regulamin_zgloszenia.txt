@@ -1,0 +1,9 @@
+4. Zgłoszenia i propozycje
+
+4.1. Możesz zgłaszać co 3h:
+Nowe sklepy.
+Promocje.
+Niedziałające linki.
+
+4.2. Wszystko trafia do administracji.
+4.3. Admin może zaakceptować lub odrzucić zgłoszenie.

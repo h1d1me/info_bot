@@ -5,6 +5,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from datetime import datetime, timedelta
+from role import add_reputation, reset_warnings
 
 MARKETPLACE_PHOTOS = "marketplace_photos"
 if not os.path.exists(MARKETPLACE_PHOTOS):
@@ -60,13 +61,12 @@ init_marketplace_db()
 
 def register_marketplace_handlers(dp: Dispatcher):
 
-    @dp.message_handler(lambda m: m.text == "Marketplace")
-    async def marketplace_menu(message: types.Message):
+    @dp.message_handler(lambda m: m.text.lower() == "anuluj", state="*")
+    async def cancel_offer_process(message: types.Message, state: FSMContext):
+        await state.finish()
         kb = ReplyKeyboardMarkup(resize_keyboard=True)
-        kb.row(KeyboardButton("Dodaj ogłoszenie"), KeyboardButton("Przeglądaj ogłoszenia"))
-        kb.row(KeyboardButton("Moje ogłoszenia"), KeyboardButton("Filtruj ogłoszenia"))  # Dodany przycisk
-        kb.row(KeyboardButton("Powrót do menu"))
-        await message.answer("🛍️ Witaj w Marketplace! Wybierz opcję:", reply_markup=kb)
+        kb.add(KeyboardButton("Powrót do menu"))
+        await message.answer("❌ Dodawanie ogłoszenia zostało anulowane.", reply_markup=kb)
 
     @dp.message_handler(lambda m: m.text == "Dodaj ogłoszenie")
     async def add_offer_start(message: types.Message, state: FSMContext):
@@ -76,7 +76,7 @@ def register_marketplace_handlers(dp: Dispatcher):
             InlineKeyboardButton("Kupię", callback_data="offer_type_kupie"),
             InlineKeyboardButton("Zamienię", callback_data="offer_type_zamienie")
         )
-        await message.answer("Wybierz typ ogłoszenia:", reply_markup=kb)
+        await message.answer("Wybierz typ ogłoszenia oraz pamiętaj możesz w każdej chwili napisać 'Anuluj', aby przerwać dodawanie ogłoszenia:", reply_markup=kb)
         await MarketplaceState.choosing_type.set()
 
     @dp.callback_query_handler(lambda c: c.data.startswith("offer_type_"), state=MarketplaceState.choosing_type)
@@ -122,7 +122,7 @@ def register_marketplace_handlers(dp: Dispatcher):
     async def transaction_chosen(callback_query: types.CallbackQuery, state: FSMContext):
         transaction_type = callback_query.data.split("_")[1]
         await state.update_data(transaction_type=transaction_type)
-        await callback_query.message.answer("Prześlij do 3 zdjęć (jedno po drugim, zakończ 'Dalej'):")
+        await callback_query.message.answer("Prześlij do 3 zdjęć (wysyłaj po jednym zdjęciu czekając na odpowiedź BOTa lub napisz *Dalej* by pominąć dodawanie zdjęć):",parse_mode="Markdown")
         await MarketplaceState.uploading_photos.set()
         await state.update_data(photos=[])
         await callback_query.answer()
@@ -204,6 +204,7 @@ def register_marketplace_handlers(dp: Dispatcher):
         conn.commit()
         conn.close()
         await callback_query.message.answer("Twoje ogłoszenie zostało dodane do Marketplace!")
+        add_reputation(callback_query.from_user.id, 5)  # +5 pkt za ogłoszenie
         await state.finish()
         await callback_query.answer()
 
@@ -234,43 +235,6 @@ def register_marketplace_handlers(dp: Dispatcher):
             kb.add(InlineKeyboardButton(label, callback_data=f"offer_{offer_id}"))
         await message.answer("Dostępne ogłoszenia:", reply_markup=kb)
 
-    @dp.callback_query_handler(lambda c: c.data.startswith("offer_"))
-    async def show_offer(callback_query: types.CallbackQuery):
-        offer_id = int(callback_query.data.split("_")[1])
-        conn = sqlite3.connect("bot_database.db")
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT user_id, user_name, offer_type, title, description, price, location, transaction_type, photo1, photo2, photo3, safe_deal, status
-            FROM marketplace WHERE id=?
-        """, (offer_id,))
-        offer = cursor.fetchone()
-        conn.close()
-        if not offer:
-            await callback_query.message.answer("Ogłoszenie nie istnieje lub zostało usunięte.")
-            return
-        user_id, user_name, offer_type, title, description, price, location, transaction_type, photo1, photo2, photo3, safe_deal, status = offer
-        text = (
-            f"{'🛡️ ' if safe_deal else ''}<b>{offer_type.capitalize()}</b>: <b>{title}</b>\n"
-            f"<i>{description}</i>\n"
-            f"<b>Cena:</b> {price}\n"
-            f"<b>Miejscowość:</b> {location}\n"
-            f"<b>Transakcja:</b> {transaction_type}\n"
-            f"<b>Sprzedający:</b> {user_name}\n"
-            f"<b>Status:</b> {status}"
-        )
-        media = []
-        for photo_path in [photo1, photo2, photo3]:
-            if photo_path and os.path.exists(photo_path):
-                media.append(types.InputMediaPhoto(open(photo_path, "rb")))
-        if media:
-            await callback_query.message.answer_media_group(media)
-        # Dodaj przyciski kontaktu i zgłoszenia
-        kb = InlineKeyboardMarkup()
-        kb.add(InlineKeyboardButton("✉️ Napisz do sprzedającego", url=f"tg://user?id={user_id}"))
-        kb.add(InlineKeyboardButton("🚩 Zgłoś ogłoszenie", callback_data=f"report_offer_{offer_id}"))
-        await callback_query.message.answer(text, parse_mode="HTML", reply_markup=kb)
-        await callback_query.answer()
-
     @dp.message_handler(lambda m: m.text == "Moje ogłoszenia")
     async def my_offers(message: types.Message):
         conn = sqlite3.connect("bot_database.db")
@@ -291,27 +255,6 @@ def register_marketplace_handlers(dp: Dispatcher):
             label = f"{offer_type.capitalize()}: {title} ({price}) [{status}]"
             kb.add(InlineKeyboardButton(label, callback_data=f"myoffer_{offer_id}"))
         await message.answer("Twoje ogłoszenia:", reply_markup=kb)
-
-    @dp.callback_query_handler(lambda c: c.data.startswith("myoffer_"))
-    async def show_my_offer(callback_query: types.CallbackQuery, state: FSMContext):
-        offer_id = int(callback_query.data.split("_")[1])
-        conn = sqlite3.connect("bot_database.db")
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT title, status FROM marketplace WHERE id=? AND user_id=?
-        """, (offer_id, callback_query.from_user.id))
-        offer = cursor.fetchone()
-        conn.close()
-        if not offer:
-            await callback_query.message.answer("Nie znaleziono ogłoszenia.")
-            return
-        title, status = offer
-        kb = InlineKeyboardMarkup()
-        if status == "active":
-            kb.add(InlineKeyboardButton("Usuń ogłoszenie", callback_data=f"delete_myoffer_{offer_id}"))
-            kb.add(InlineKeyboardButton("Edytuj ogłoszenie", callback_data=f"edit_myoffer_{offer_id}"))
-        await callback_query.message.answer(f"Ogłoszenie: {title}\nStatus: {status}", reply_markup=kb)
-        await callback_query.answer()
 
     @dp.callback_query_handler(lambda c: c.data.startswith("delete_myoffer_"))
     async def delete_my_offer(callback_query: types.CallbackQuery):
@@ -339,39 +282,6 @@ def register_marketplace_handlers(dp: Dispatcher):
         for offer_id, title, status in offers:
             kb.add(InlineKeyboardButton(f"{title} [{status}]", callback_data=f"admin_offer_{offer_id}"))
         await message.answer("Moderacja ogłoszeń:", reply_markup=kb)
-
-    @dp.callback_query_handler(lambda c: c.data.startswith("admin_offer_"))
-    async def admin_offer_action(callback_query: types.CallbackQuery):
-        offer_id = int(callback_query.data.split("_")[2])
-        kb = InlineKeyboardMarkup()
-        kb.add(
-            InlineKeyboardButton("Usuń", callback_data=f"admin_remove_{offer_id}"),
-            InlineKeyboardButton("Wstrzymaj i poproś o poprawę", callback_data=f"admin_pending_{offer_id}")
-        )
-        await callback_query.message.answer("Co zrobić z tym ogłoszeniem?", reply_markup=kb)
-        await callback_query.answer()
-
-    @dp.callback_query_handler(lambda c: c.data.startswith("admin_remove_"))
-    async def admin_remove_offer(callback_query: types.CallbackQuery):
-        offer_id = int(callback_query.data.split("_")[2])
-        conn = sqlite3.connect("bot_database.db")
-        cursor = conn.cursor()
-        cursor.execute("UPDATE marketplace SET status='removed' WHERE id=?", (offer_id,))
-        conn.commit()
-        conn.close()
-        await callback_query.message.answer("Ogłoszenie usunięte.")
-        await callback_query.answer()
-
-    @dp.callback_query_handler(lambda c: c.data.startswith("admin_pending_"))
-    async def admin_pending_offer(callback_query: types.CallbackQuery):
-        offer_id = int(callback_query.data.split("_")[2])
-        conn = sqlite3.connect("bot_database.db")
-        cursor = conn.cursor()
-        cursor.execute("UPDATE marketplace SET status='pending' WHERE id=?", (offer_id,))
-        conn.commit()
-        conn.close()
-        await callback_query.message.answer("Ogłoszenie wstrzymane. Powiadom użytkownika o poprawkach.")
-        await callback_query.answer()
 
     # --- 2. Kontakt do sprzedającego ---
     @dp.callback_query_handler(lambda c: c.data.startswith("offer_"))

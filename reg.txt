@@ -1,0 +1,8 @@
+/regulamin – wstęp i ogólne zasady
+/przewodnik – przewodnik użytkownika
+/opinie – zasady opinii i punktacji
+/rangi – opis rang
+/zgloszenia – zgłoszenia i propozycje
+/odpowiedzialnosc – odpowiedzialność i kontakt
+/zakazy – lista zakazów
+/komendy – lista komend
